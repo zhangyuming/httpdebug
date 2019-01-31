@@ -26,12 +26,9 @@ var silence bool
 
 func main()  {
 
-
 	flag.StringVar(&upstream,"u","","被代理的服务器 eg: 172.30.0.100:8080")
-	//flag.StringVar(&upstream,"u","172.20.1.120:8080","upstream (real server) no default value")
 	flag.StringVar(&listen,"l","8899","监听的端口")
 	flag.StringVar(&pattern,"p",".*","过滤URL 支持正则表达式")
-
 	flag.StringVar(&responeHeader,"h","Content-Type: application/json;charset=utf-8",
 		"直接响应 HEADE \r\n例如： -h \"Connection: keep-alive,Content-Type: application/json\"\r\n")
 	flag.StringVar(&responseBody,"b","default body","直接相应 BODY， 可以直接跟字符串，亦可接文件（@filepath） \r\n" +
@@ -41,48 +38,35 @@ func main()  {
 	flag.IntVar(&responseCode,"c",200,"直接响应 code (默认200)")
 	flag.Parse()
 
-
 	log.Print("listen: ", listen, " upstream : ", upstream)
-
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		index := getIndex()
 
-
 		log.Print("[",index,"]",r.Method,r.URL.Path)
-
-
 
 		if strings.Contains(r.URL.Path,"favicon"){
 			return
 		}
-
 		if upstream == "" {
 			debugRequest(index,r)
-
 			for k,v := range parseCmdHeader(responeHeader){
 				w.Header().Set(k,v)
 			}
 			w.WriteHeader(responseCode)
-
 			bd,err := parseCmdBody(responseBody)
 			if err != nil{
 				log.Fatalln("parse body failed",err)
 			}
-
 			w.Write([]byte(bd))
-
 			return
 		}
+
 		reg := regexp.MustCompile(pattern)
 		if reg.MatchString(r.URL.Path) && !silence{
 			debugRequest(index,r)
 		}
-
-
-
 		director := func(req *http.Request) {
-
 			target,_ := url.Parse("http://" + upstream)
 			targetQuery := target.RawQuery
 			req.URL.Scheme = target.Scheme
@@ -97,42 +81,30 @@ func main()  {
 				// explicitly disable User-Agent so it's not set to default value
 				req.Header.Set("User-Agent", "")
 			}
-
 		}
 		modifyResp :=  func(resp *http.Response) error{
 			if reg.MatchString(r.URL.Path) && !silence{
 				debugResponse(index,resp)
 			}
-
-
-
 			return nil
 		}
 		proxy := &httputil.ReverseProxy{Director:director, ModifyResponse:modifyResp}
-
 		proxy.ServeHTTP(w,r)
-
 	})
-
 	log.Fatalln(http.ListenAndServe(":"+listen, nil))
-
 }
-
 
 var index = 0
 func getIndex() string  {
-
 	mux := sync.Mutex{}
 	mux.Lock()
 	defer mux.Unlock()
-
 	result := fmt.Sprintf("%v_%v",time.Now().UnixNano(),index)
 	index++
 	return result
 }
 
 func debugResponse(index string ,resp *http.Response)  {
-
 	log.Print("[",index,"]Response <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 	log.Print("[",index,"]Header ------------------------- ")
 	log.Print("[",index,"] ",resp.Proto," ",resp.Status)
@@ -164,11 +136,7 @@ func debugResponse(index string ,resp *http.Response)  {
 		body := string(bt)
 		log.Print("[",index,"]", body)
 		resp.Body= ioutil.NopCloser(strings.NewReader(body))
-
 	}
-
-
-
 	log.Print("[",index,"]ResponseEnd <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 }
 
@@ -183,9 +151,7 @@ func debugRequest(index string, req *http.Request)  {
 		}
 	}
 	log.Print("[",index,"]Body --------------------------")
-
 	bt,_ := ioutil.ReadAll(req.Body)
-
 	body := string(bt)
 	log.Print("[",index,"]",body)
 	req.Body= ioutil.NopCloser(strings.NewReader(body))
